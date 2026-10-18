@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="免税控除">
+<meta name="theme-color" content="#0b1620">
+<title>免税事業者からの仕入れ 控除計算</title>
+<style>
+*{box-sizing:border-box}body{margin:0 auto;font-family:-apple-system,"Hiragino Sans",sans-serif;background:#0b1620;color:#e6f7ff;padding:20px;max-width:520px}
+h1{font-size:20px;color:#4fe3ff;text-align:center;margin:8px 0 4px}.sub{text-align:center;font-size:12px;color:#6d8c9b;margin-bottom:18px}
+.card{background:#12232f;border:1px solid #1f3b4d;border-radius:16px;padding:16px;margin-bottom:14px}
+label{font-size:13px;color:#8fb3c4;display:block;margin:0 0 6px}
+input{width:100%;font-size:22px;padding:10px 12px;border-radius:12px;border:1px solid #2b5268;background:#08121a;color:#fff}
+input#amt{text-align:right;font-size:26px}input[type=text].nm{font-size:16px}
+.seg{display:flex;gap:8px;margin-bottom:12px}.seg button{flex:1;padding:11px;font-size:15px;border-radius:12px;border:1px solid #2b5268;background:#08121a;color:#8fb3c4}
+.seg button.on{background:#4fe3ff;color:#06222c;font-weight:bold;border-color:#4fe3ff}
+.f{margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed #1f3b4d}.row:last-child{border:none}
+.row span{color:#8fb3c4;font-size:14px}.row b{font-size:20px}.big b{font-size:30px;color:#4fe3ff}.ng b{color:#ff8a80}
+.pct{display:inline-block;background:#ffc93c;color:#2a1d00;font-weight:bold;border-radius:999px;padding:2px 10px;font-size:14px}
+.add{width:100%;padding:13px;font-size:16px;border:none;border-radius:12px;background:#4fe3ff;color:#06222c;font-weight:bold;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 4px;border-bottom:1px solid #1f3b4d}td:last-child{text-align:right}
+tr.now td{color:#ffc93c;font-weight:bold}
+.item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #1f3b4d;font-size:13px}
+.item .l{color:#8fb3c4}.item .r{text-align:right}.item button{background:none;border:none;color:#ff8a80;font-size:16px}
+.note{font-size:11.5px;color:#6d8c9b;line-height:1.6}
+</style></head><body>
+<h1>🧾 免税事業者からの仕入れ 控除計算</h1>
+<div class="sub">インボイス経過措置（8割→7・5・3割控除）対応</div>
+
+<div class="card">
+<div class="f"><label>仕入れた日（引渡し日／役務の完了日）</label><input id="date" type="date"></div>
+<div class="f"><label>メモ（任意）</label><input id="memo" class="nm" type="text" placeholder="例：〇〇商店 材料費"></div>
+<div class="f"><label>支払った金額（円）</label><input id="amt" type="text" inputmode="numeric" placeholder="0"></div>
+<div class="seg" id="mode"><button data-v="in" class="on">税込で入力</button><button data-v="ex">税抜で入力</button></div>
+<div class="seg" id="rate" style="margin:0"><button data-v="10" class="on">10%</button><button data-v="8">8%（軽減）</button></div>
+</div>
+
+<div class="card">
+<div class="row"><span>適用される控除割合</span><span class="pct" id="o-pct">70%</span></div>
+<div class="row"><span>消費税相当額（全額）</span><b id="o-tax">0円</b></div>
+<div class="row big"><span>控除できる額</span><b id="o-ded">0円</b></div>
+<div class="row ng"><span>控除できない額（実質コスト増）</span><b id="o-ng">0円</b></div>
+<button class="add" id="add">＋ この仕入れをリストに追加</button>
+</div>
+
+<div class="card" id="listcard" style="display:none">
+<label>仕入れリスト</label><div id="list"></div>
+<div class="row"><span>消費税相当額 合計</span><b id="t-tax">0円</b></div>
+<div class="row big"><span>控除できる額 合計</span><b id="t-ded">0円</b></div>
+<div class="row ng"><span>控除できない額 合計</span><b id="t-ng">0円</b></div>
+</div>
+
+<div class="card"><label>控除割合のスケジュール</label>
+<table id="sch"></table></div>
+
+<p class="note">・割合は「仕入れた時期」で決まります（商品は引渡し日、サービスは全部完了した日。支払日ではありません）。<br>
+・区分記載請求書と同等の請求書、帳簿への「80%控除対象」等の記載が必要です。<br>
+・令和8年10月1日以後に開始する課税期間から、同じ相手からの仕入れが年1億円を超える部分は対象外です。<br>
+・端数は切り捨てで計算した目安です。正式な申告は税理士・税務署にご確認ください。<br>
+出典：国税庁 インボイス制度 令和8年度税制改正資料</p>
+
+<script>
+const S=[["2023-10-01","2026-09-30",80],["2026-10-01","2028-09-30",70],["2028-10-01","2030-09-30",50],["2030-10-01","2031-09-30",30],["2031-10-01","9999-12-31",0]];
+const L=["R5.10.1〜R8.9.30","R8.10.1〜R10.9.30","R10.10.1〜R12.9.30","R12.10.1〜R13.9.30","R13.10.1〜"];
+const $=id=>document.getElementById(id);let mode="in",rate=10,items=JSON.parse(localStorage.getItem("menzei-v1")||"[]");
+const f=n=>Math.floor(n).toLocaleString("ja-JP")+"円";
+function pctOf(d){if(d<"2023-10-01")return null;for(const s of S)if(d>=s[0]&&d<=s[1])return s[2];return 0}
+function seg(id,cb){$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{$(id).querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");cb(b.dataset.v);calc()})}
+seg("mode",v=>mode=v);seg("rate",v=>rate=+v);
+function comp(){const raw=$("amt").value.replace(/[^\d]/g,"");const a=+raw||0;const d=$("date").value;const p=pctOf(d);
+ const tax=Math.floor(mode==="in"?a*rate/(100+rate):a*rate/100);const ded=p==null?0:Math.floor(tax*p/100);return{a,d,p,tax,ded,ng:tax-ded,raw}}
+function calc(){const c=comp();$("amt").value=c.raw?(+c.raw).toLocaleString("ja-JP"):"";
+ $("o-pct").textContent=c.p==null?"対象外（R5.10前）":c.p+"%";$("o-tax").textContent=f(c.tax);$("o-ded").textContent=f(c.ded);$("o-ng").textContent=f(c.ng);sched(c.d)}
+function sched(d){$("sch").innerHTML=S.map((s,i)=>`<tr class="${d>=s[0]&&d<=s[1]?"now":""}"><td>${L[i]}</td><td>${s[2]?s[2]+"% 控除":"控除不可"}</td></tr>`).join("")}
+function render(){localStorage.setItem("menzei-v1",JSON.stringify(items));$("listcard").style.display=items.length?"":"none";
+ $("list").innerHTML=items.map((x,i)=>`<div class="item"><div class="l">${x.d}<br>${x.m||"（メモなし）"} ・${x.r}% ・${x.p}%控除</div><div class="r">${f(x.a)}${x.mo==="in"?"(込)":"(抜)"}<br>控除 ${f(x.ded)}</div><button data-i="${i}">✕</button></div>`).join("");
+ $("list").querySelectorAll("button").forEach(b=>b.onclick=()=>{items.splice(+b.dataset.i,1);render()});
+ const s=k=>items.reduce((t,x)=>t+x[k],0);$("t-tax").textContent=f(s("tax"));$("t-ded").textContent=f(s("ded"));$("t-ng").textContent=f(s("ng"))}
+$("add").onclick=()=>{const c=comp();if(!c.a||c.p==null)return;items.push({d:c.d,m:$("memo").value.trim(),a:c.a,mo:mode,r:rate,p:c.p,tax:c.tax,ded:c.ded,ng:c.ng});$("amt").value="";$("memo").value="";calc();render()};
+const t=new Date();$("date").value=new Date(t-t.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+$("amt").oninput=calc;$("date").oninput=calc;calc();render();
+</script></body></html>
